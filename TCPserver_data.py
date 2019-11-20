@@ -1,7 +1,7 @@
 
 
 
- 
+
 #bind_ip = '0.0.0.0'
 #bind_port = 9999
 
@@ -19,33 +19,61 @@ class unit:
   self.unit_ip = unit_ip
   self.unit_port = unit_port
   self.buffor_size = 1024
-  self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  self.vr = [True, True, True, True, True, True, True, True]
+  self.vrauto = [False, False, False, False, False, False, False, False]
   self.connected = False
-  try:
-   self.s.connect((self.unit_ip, self.unit_port))
-   self.s.send("ping")
-   self.data = self.s.recv(buffor_size)
-   if data == "pong":
-    self.connected = True
-  except:
-   self.s.close()
- def keep_alive(self):
-  while self.connected:
+  self.try_to_connect_again = True
+  self.continue_loop = True
+  self.demon = threading.Thread(target = self.unit_demonized, args = ()).start()
+ def unit_demonized(self):
+  while self.try_to_connect_again:#I assumed that it will be some separated thread.....
    try:
-    self.s.send('ping')
-   except:
+    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.s.connect((self.unit_ip, self.unit_port))
+    self.connected = True
+    self.s.send(self.unit_name + " st")
+    print 'ST request sent to ' + self.unit_name
+    while self.continue_loop:
+     self.data = self.s.recv(self.buffor_size)
+     print 'From ' + self.unit_name + ' recieved: ' + self.data
+     #self.data = self.data.strip()
+     self.handle_command(self.data)
+   except Exception as ex:
+    print 'exception has been raised and him.s.closed() ::' + ex.message
     self.s.close()
-    continueloop = False
-   try:
-    data = self.s.recv(self.buffer)
-   except:
-    self.s.close()  
-    continueloop = False
-   if data == "pong":
-    self.connected = True
-  
-  
-  #  #s.close()  
+    self.connected = False
+    time.sleep(15)
+ def handle_command(self, data):
+  command = data.split(" ")
+  print command[0] + '  ' + self.unit_name
+  try:
+   if command[0] == self.unit_name:
+    print command[1] + '  ' + "relay_status"
+    if command[1] == "relay_status":
+     #here will come self update but it is hard to do it adhoc
+     print len(me.client_socket_list)
+     for i in me.client_socket_list:
+      try:
+       print i.getsockname()
+       i.send(data)
+       print data + ' forwarded back'
+      except Exception as ex:
+       print 'failed to forward response from ' + self.unit_name + ' with Ex: ' + ex
+       me.client_socket_list.remove(i)
+   else:
+    print self.unit_name + ' send some forwarded message. Is there more then one master?'
+  except Exception as ex:
+   print 'Handle_command for unit ' + self.unit_name + ' has faild and riased: ' + ex
+   print command
+ def relay_switch(self, num, nval, force = False):
+  if not self.vrauto[num] or force :
+   self.vr[num]=bool(nval)
+ def auto_switch(self, num, nval):
+  self.vrauto[num]=bool(nval)
+
+
+
+
 
 
 class unit_me:
@@ -56,12 +84,13 @@ class unit_me:
   self.buffor_size = 1024
   self.vr = [True, True, True, True, True, True, True, True]
   self.vrauto = [False, False, False, False, False, False, False, False]
-  self.relay_pins = [17, 27, 22, 5, 6, 13, 19, 26]
-  self.PRP = 24
+  self.relay_pins = [21, 20, 16, 12, 25, 24, 23, 18]
+  self.PRP = 17
   self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
   self.s.bind((unit_ip, unit_port)) 
   self.s.listen(15)
+  self.client_socket_list = []
   print 'Listening on {}:{}'.format(self.unit_ip, self.unit_port)
   #s.close()
  def relay_switch(self, num, nval, force = False):
@@ -71,7 +100,7 @@ class unit_me:
  def auto_switch(self, num, nval):
   self.vrauto[num]=bool(nval)
  def relay_status(self):
-  message = "Warsztat relay_status"
+  message = self.unit_name + " relay_status"
   for i in self.vr:
    message = message + " " + str(int(i))
   message = message + " auto"
@@ -119,3 +148,63 @@ class unit_me:
   return reading
 
 
+
+
+
+
+
+
+
+
+
+
+
+class unit_OLD:
+ def __init__(self, unit_name, unit_ip, unit_port):
+  self.unit_name = unit_name
+  self.unit_ip = unit_ip
+  self.unit_port = unit_port
+  self.buffor_size = 1024
+#  self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  self.connected = False
+  self.try_to_connect_again = True
+  while self.try_to_connect_again:
+   try:
+    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.s.connect((self.unit_ip, self.unit_port))
+    self.s.send("ping")
+    print 'ping sent'
+    self.data = self.s.recv(self.buffor_size)
+    print 'recieved ' + self.data
+    if self.data == "pong":
+     print 'pong and proceeded'
+     self.connected = True
+     keep_alive_thread = threading.Thread(target=self.keep_alive, args=()).start()
+     self.try_to_connect_again = False
+   except Exception as ex:
+    print 'exception has been raised and him.s.closed() ::' + ex.message
+    self.s.close()
+    time.sleep(15)
+ def keep_alive(self):
+  print 'keep_alive started'
+  while self.connected:
+   try:
+    self.s.send('ping')
+    print 'keep_alive ping sent'
+   except Exception as ex:
+    self.s.close()
+    print 'keep_alive 1st try: ' + ex.message
+    #continueloop = False
+   try:
+    self.data = self.s.recv(self.buffor_size)
+    print 'keep_alive received: ' + self.data
+   except Exception as ex:
+    print 'keep_alive 1st try: ' + ex.message
+    self.s.close()  
+    #continueloop = False
+   if self.data == "pong":
+    self.connected = True
+   time.sleep(10)
+   print 'keep_alive loop complete'
+  
+  #  s.close()  
