@@ -128,3 +128,131 @@ def auto_switch(num, nval):
 
 
 
+
+
+
+class unit_OLD:
+ def __init__(self, unit_name, unit_ip, unit_port):
+  self.unit_name = unit_name
+  self.unit_ip = unit_ip
+  self.unit_port = unit_port
+  self.buffor_size = 1024
+#  self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+  self.connected = False
+  self.try_to_connect_again = True
+  while self.try_to_connect_again:
+   try:
+    self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    self.s.connect((self.unit_ip, self.unit_port))
+    self.s.send("ping")
+    print 'ping sent'
+    self.data = self.s.recv(self.buffor_size)
+    print 'recieved ' + self.data
+    if self.data == "pong":
+     print 'pong and proceeded'
+     self.connected = True
+     keep_alive_thread = threading.Thread(target=self.keep_alive, args=()).start()
+     self.try_to_connect_again = False
+   except Exception as ex:
+    print 'exception has been raised and him.s.closed() ::' + ex.message
+    self.s.close()
+    time.sleep(15)
+ def keep_alive(self):
+  print 'keep_alive started'
+  while self.connected:
+   try:
+    self.s.send('ping')
+    print 'keep_alive ping sent'
+   except Exception as ex:
+    self.s.close()
+    print 'keep_alive 1st try: ' + ex.message
+    #continueloop = False
+   try:
+    self.data = self.s.recv(self.buffor_size)
+    print 'keep_alive received: ' + self.data
+   except Exception as ex:
+    print 'keep_alive 1st try: ' + ex.message
+    self.s.close()  
+    #continueloop = False
+   if self.data == "pong":
+    self.connected = True
+   time.sleep(10)
+   print 'keep_alive loop complete'
+  
+  #  s.close()  
+
+
+
+
+
+#bind_ip = '0.0.0.0'
+#bind_port = 9999
+
+#vr = [True, True, True, True, True, True, True, True] #vr (virtual relay) initial list to hold relays states which can be altered directly to GPIOs or indirect what would required additional function to manipulate GPIOs
+#vrauto = [False, False, False, False, False, False, False, False]
+#relay_pins = [17, 27, 22, 5, 6, 13, 19, 26, 17] #provide desired pins number for your installation, please see GPIO pins numbers for your version of RPI
+
+#PRP = 24
+#unit_name = "Warsztat"
+#units = [["Warsztat", "192.168.1.150", 9999],["Kury", "192.168.1.151", 9999],["Front","192.168.1.152", 9999]]
+
+
+
+
+def handle_client_connection(client_socket, me):
+# try:
+ continueloop = True
+ while continueloop:
+  try:
+   request = client_socket.recv(1024)
+  except:
+   client_socket.send('server killed client')
+   print 'client died'
+   me.client_socket_list.remove(client_socket)
+   client_socket.close()
+#  time.sleep(15)
+  if request is not None and len(request)>0:
+   dataFromClient = request.decode()
+   dataFromClient = dataFromClient.strip()
+   print dataFromClient
+   command = dataFromClient.split(" ")
+   print command[0]
+   if command[0] == me.unit_name:
+    handle_command(client_socket, command, me)
+   elif command[0] == "ping":
+    client_socket.send("pong")
+    print 'pong send'
+   elif command[0] == "break":
+    continueloop = False
+    print "Connection breaked"
+    client_socket.close()
+   else:
+    print 'forwarded: ' + dataFromClient
+    if command[0] == him.unit_name:
+     him.s.send(dataFromClient)
+  else:
+   me.client_socket_list.remove(client_socket)
+   client_socket.close()
+   continueloop = False
+   print 'connection terminated'
+
+
+
+  
+def handle_command(client_socket, command, me):
+ try:
+  if command[1] == "r1":
+   me.relay_switch(int(command[2]),int(command[3]))
+   me.send_relay_status(client_socket)
+  elif command[1] == "rs":
+   me.relays_switch(int(command[2]))
+   me.send_relay_status(client_socket)
+  elif command[1] == "st":
+   me.send_relay_status(client_socket)
+  elif command[1] == "rauto":
+   me.auto_switch(int(command[2]), int(command[3]))
+  else:
+   print 'Im stuck'
+ except Exception as ex:
+  print 'handle command failed: ' + ex.message
+
