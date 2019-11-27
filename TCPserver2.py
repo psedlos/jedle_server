@@ -15,6 +15,8 @@ def mainLooper(me):
 
 
 
+
+
 def startapp(master):
  global me
  global him
@@ -42,8 +44,6 @@ def startapp(master):
    args=(client_sock, )  # without comma you'd get a... TypeError: handle_client_connection() argument after * must be a sequence, not _socketobject
    )
   client_handler.start()
-
-
 
 
 
